@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Absensi YRBN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .bg-primary { background-color: #1E40AF; }
+        .text-primary { color: #1E40AF; }
+        .bg-secondary { background-color: #FB923C; }
+        .hidden { display: none; }
+        #video-preview { transform: scaleX(-1); border-radius: 1.5rem; width: 100%; max-width: 250px; background: #000; }
+        canvas { display: none; }
+        .btn-active:active { transform: scale(0.95); transition: 0.1s; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+
+    <div id="login-screen" class="fixed inset-0 bg-primary z-[100] flex items-center justify-center px-4">
+        <div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-sm text-center">
+            <h2 class="text-xl font-black text-gray-800 uppercase leading-tight mb-2">Yayasan Radja Barita Nusantara</h2>
+            <p class="text-[10px] text-orange-500 font-bold tracking-widest mb-8 italic uppercase">Payroll System (YRBN)</p>
+            <div class="space-y-4">
+                <input type="text" id="loginNIP" placeholder="NIP / Username" class="w-full p-4 border rounded-2xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 font-bold">
+                <input type="password" id="loginPass" placeholder="Password PIN" class="w-full p-4 border rounded-2xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="handleLogin()" class="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg hover:brightness-110 btn-active uppercase text-sm">Masuk</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-app" class="hidden">
+        <header class="bg-white shadow-sm sticky top-0 z-50">
+            <div class="container mx-auto px-4 py-4 flex justify-between items-center text-xs font-black">
+                <h1 class="text-lg italic text-primary underline decoration-secondary">YRBN<span class="text-secondary text-sm">.PRO</span></h1>
+                <nav class="hidden md:flex space-x-6 uppercase">
+                    <a href="#" onclick="showPage('dashboard')" class="hover:text-primary">Dashboard</a>
+                    <a href="#" onclick="showPage('absen')" class="hover:text-primary">Absen</a>
+                    <a href="#" onclick="showPage('karyawan')" id="nav-karyawan" class="hidden text-red-600">Manajemen HR</a>
+                    <a href="#" onclick="showPage('rekap')" id="nav-rekap" class="hidden text-red-600">Laporan</a>
+                </nav>
+                <button onclick="location.reload()" class="text-red-500 bg-red-50 px-4 py-2 rounded-xl font-bold">LOGOUT</button>
+            </div>
+        </header>
+
+        <main class="container mx-auto px-4 py-6">
+            
+            <section id="dashboard" class="page-content">
+                <div class="bg-white p-6 rounded-[2rem] shadow-sm mb-6 flex flex-col md:flex-row justify-between items-start md:items-center border gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold">Selamat Datang, <span id="userNameDisplay">User</span></h2>
+                        <p class="text-[10px] text-gray-400 font-bold uppercase">Siklus: <span id="cycleLabel" class="text-orange-500"></span></p>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <div class="text-center">
+                            <p class="text-[9px] text-gray-400 font-bold uppercase italic">Kehadiran</p>
+                            <p id="statHadir" class="text-3xl font-black text-primary">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-orange-100">
+                        <h3 class="font-black text-xs uppercase text-orange-500 mb-4"><i class="fas fa-calculator mr-2"></i>Kalkulator Estimasi Gaji Saya</h3>
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <input type="number" id="gapok" oninput="calcSalary()" placeholder="Gaji Pokok" class="p-3 border rounded-xl text-xs bg-gray-50">
+                            <input type="number" id="transport" oninput="calcSalary()" placeholder="Transport / Hari" class="p-3 border rounded-xl text-xs bg-gray-50">
+                        </div>
+                        <div class="space-y-2 mb-4" id="tunjanganList">
+                            <div class="flex gap-2">
+                                <input type="text" placeholder="Nama Tunjangan" class="t-name w-1/2 p-3 border rounded-xl text-xs bg-gray-50">
+                                <input type="number" oninput="calcSalary()" placeholder="Rp" class="t-val w-1/2 p-3 border rounded-xl text-xs bg-gray-50">
+                            </div>
+                        </div>
+                        <button onclick="addTunjanganField()" class="text-[9px] font-bold text-blue-500 uppercase">+ Tambah Tunjangan</button>
+                        
+                        <div class="mt-6 p-4 bg-orange-50 rounded-2xl border border-orange-200">
+                            <p class="text-[10px] font-bold text-orange-800 uppercase">Estimasi Diterima Periode Ini:</p>
+                            <p id="totalEstimasi" class="text-2xl font-black text-gray-800">Rp 0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 gap-4">
+                        <button onclick="showPage('absen')" class="bg-primary text-white p-8 rounded-[2rem] shadow-xl font-bold btn-active">
+                            <i class="fas fa-fingerprint text-3xl mb-2"></i><br><span class="text-xs tracking-widest uppercase">Mulai Absen</span>
+                        </button>
+                        <div class="bg-white p-6 rounded-[2rem] shadow-sm border flex flex-col items-center justify-center">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase">Status Hari Ini</p>
+                            <p id="statToday" class="text-xs font-black mt-1">BELUM ABSEN</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="absen" class="page-content hidden">
+                <div class="max-w-md mx-auto bg-white rounded-[2.5rem] shadow-2xl p-8 text-center border">
+                    <h2 id="liveTime" class="text-4xl font-black mb-1">00:00:00</h2>
+                    <p id="liveDate" class="text-[10px] text-gray-400 uppercase mb-8"></p>
+                    <div class="flex flex-col items-center mb-6">
+                        <video id="video-preview" autoplay playsinline class="shadow-lg mb-4"></video>
+                        <img id="photo-result" class="hidden rounded-[1.5rem] border-4 border-green-500 w-[200px] mb-4 shadow-lg">
+                        <button id="btn-snap" onclick="takeSnapshot()" class="bg-blue-600 text-white px-10 py-3 rounded-full font-black text-xs btn-active">AMBIL FOTO</button>
+                    </div>
+                    <p id="locStatus" class="text-[9px] text-blue-500 font-bold mb-8 italic">📍 MENCARI LOKASI GPS...</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="submitAbsen('MASUK')" class="bg-green-600 text-white py-5 rounded-3xl font-black shadow-lg btn-active uppercase">Masuk</button>
+                        <button onclick="submitAbsen('PULANG')" class="bg-red-600 text-white py-5 rounded-3xl font-black shadow-lg btn-active uppercase">Pulang</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="karyawan" class="page-content hidden">
+                <div class="grid lg:grid-cols-3 gap-6">
+                    <div class="space-y-6">
+                        <div class="bg-white p-6 rounded-3xl shadow-sm border">
+                            <h3 class="font-bold mb-4 text-xs uppercase">Tambah Manual</h3>
+                            <input type="text" id="newInpID" placeholder="NIP" class="w-full p-3 border rounded-xl text-sm mb-2">
+                            <input type="text" id="newInpName" placeholder="Nama" class="w-full p-3 border rounded-xl text-sm mb-2">
+                            <input type="password" id="newInpPin" placeholder="PIN" class="w-full p-3 border rounded-xl text-sm mb-4">
+                            <button onclick="addEmployee()" class="w-full bg-primary text-white font-bold py-3 rounded-xl uppercase text-xs">Simpan</button>
+                        </div>
+                        <div class="bg-blue-50 p-6 rounded-3xl border-2 border-dashed border-blue-200">
+                            <h3 class="font-bold mb-2 text-blue-600 uppercase text-xs">Import Karyawan (CSV)</h3>
+                            <p class="text-[9px] text-gray-400 mb-2 italic">Format Excel (CSV): NIP,Nama,PIN</p>
+                            <input type="file" id="csvFile" accept=".csv" class="text-[10px] w-full mb-3">
+                            <button onclick="importCSV()" class="w-full bg-green-600 text-white font-bold py-2 rounded-xl text-xs">UPLOAD CSV</button>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm overflow-x-auto border">
+                        <table class="w-full text-left text-xs">
+                            <thead><tr><th class="p-4 border-b">NIP</th><th class="p-4 border-b">NAMA</th><th class="p-4 border-b text-right">AKSI</th></tr></thead>
+                            <tbody id="listKaryawan"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="rekap" class="page-content hidden">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border mb-6">
+                    <h2 class="font-black text-gray-800 uppercase text-xs mb-4 text-center">Export Laporan Payroll Yayasan Radja Barita Nusantara</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <input type="date" id="exportStart" class="w-full p-2 border rounded-lg text-sm">
+                        <input type="date" id="exportEnd" class="w-full p-2 border rounded-lg text-sm">
+                        <button onclick="downloadCSV()" class="bg-green-600 text-white font-black p-3 rounded-lg text-[10px] uppercase shadow-md">Download Laporan (.CSV)</button>
+                    </div>
+                </div>
+                <div id="rekapTableContainer" class="bg-white p-6 rounded-3xl shadow-sm border overflow-x-auto">
+                    <table class="w-full text-[10px] text-left">
+                        <thead><tr class="bg-gray-50 uppercase font-black"><th class="p-4 border-b">Waktu</th><th class="p-4 border-b">Nama</th><th class="p-4 border-b text-center text-green-600">IN</th><th class="p-4 border-b text-center text-red-600">OUT</th><th class="p-4 border-b text-center">Foto</th><th class="p-4 border-b text-center">Map</th></tr></thead>
+                        <tbody id="listRekap"></tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <canvas id="canvas-photo"></canvas>
+
+    <script>
+        let dbKaryawan = JSON.parse(localStorage.getItem('rbn_v9_karyawan')) || [{id:'admin', name:'Admin HR', pin:'admin123', role:'admin'}];
+        let dbAbsen = JSON.parse(localStorage.getItem('rbn_v9_absen')) || [];
+        let currentUser = null;
+        let currentCoords = "";
+        let currentPhoto = "";
+        let cameraStream = null;
+
+        // GPS
+        if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition(p => {
+                currentCoords = `${p.coords.latitude},${p.coords.longitude}`;
+                const el = document.getElementById('locStatus');
+                if(el) el.innerHTML = `📍 LOKASI SIAP: ${currentCoords}`;
+            }, null, { enableHighAccuracy: true });
+        }
+
+        // LOGIN
+        function handleLogin() {
+            const nip = document.getElementById('loginNIP').value;
+            const pin = document.getElementById('loginPass').value;
+            const user = dbKaryawan.find(u => u.id === nip && u.pin === pin);
+            if(user) {
+                currentUser = user;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                document.getElementById('userNameDisplay').innerText = user.name;
+                if(user.role === 'admin') {
+                    document.getElementById('nav-karyawan').classList.remove('hidden');
+                    document.getElementById('nav-rekap').classList.remove('hidden');
+                }
+                setCycleLabel();
+                showPage('dashboard');
+                setDefaultDates();
+            } else { alert("NIP atau PIN salah!"); }
+        }
+
+        function setCycleLabel() {
+            const now = new Date();
+            let sDate, sMonth, sYear, eDate, eMonth, eYear;
+            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            
+            if (now.getDate() >= 26) {
+                sDate = 26; sMonth = now.getMonth(); sYear = now.getFullYear();
+                eDate = 25; eMonth = now.getMonth() + 1; eYear = now.getFullYear();
+                if(eMonth > 11) { eMonth = 0; eYear++; }
+            } else {
+                sDate = 26; sMonth = now.getMonth() - 1; sYear = now.getFullYear();
+                if(sMonth < 0) { sMonth = 11; sYear--; }
+                eDate = 25; eMonth = now.getMonth(); eYear = now.getFullYear();
+            }
+            document.getElementById('cycleLabel').innerText = `${sDate} ${monthNames[sMonth]} ${sYear} - ${eDate} ${monthNames[eMonth]} ${eYear}`;
+        }
+
+        function showPage(id) {
+            document.querySelectorAll('.page-content').forEach(p => p.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+            if(id === 'absen') initCamera();
+            if(id === 'dashboard') { renderDashboard(); calcSalary(); }
+            if(id === 'karyawan') renderKaryawanTable();
+            if(id === 'rekap') renderRekapTable();
+        }
+
+        // SALARY CALC
+        function addTunjanganField() {
+            const div = document.createElement('div');
+            div.className = "flex gap-2";
+            div.innerHTML = `<input type="text" placeholder="Nama Tunjangan" class="t-name w-1/2 p-3 border rounded-xl text-xs bg-gray-50">
+                             <input type="number" oninput="calcSalary()" placeholder="Rp" class="t-val w-1/2 p-3 border rounded-xl text-xs bg-gray-50">`;
+            document.getElementById('tunjanganList').appendChild(div);
+        }
+
+        function calcSalary() {
+            const hadir = parseInt(document.getElementById('statHadir').innerText) || 0;
+            const gapok = parseFloat(document.getElementById('gapok').value) || 0;
+            const transportPerDay = parseFloat(document.getElementById('transport').value) || 0;
+            
+            let totalTunjangan = 0;
+            document.querySelectorAll('.t-val').forEach(input => {
+                totalTunjangan += parseFloat(input.value) || 0;
+            });
+
+            const total = gapok + (transportPerDay * hadir) + totalTunjangan;
+            document.getElementById('totalEstimasi').innerText = "Rp " + total.toLocaleString('id-ID');
+        }
+
+        function renderDashboard() {
+            const hadir = getCycleStats();
+            document.getElementById('statHadir').innerText = hadir;
+            const todayStr = new Date().toLocaleDateString('id-ID');
+            const hasAbsen = dbAbsen.find(a => a.nama === currentUser.name && a.tgl === todayStr);
+            if(todayAbsen = hasAbsen) {
+                document.getElementById('statToday').innerText = "SUDAH " + todayAbsen.tipe;
+                document.getElementById('statToday').className = "text-xs font-black text-green-600 mt-1 uppercase";
+            }
+        }
+
+        function getCycleStats() {
+            const now = new Date();
+            let start, end;
+            if (now.getDate() >= 26) {
+                start = new Date(now.getFullYear(), now.getMonth(), 26);
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 25);
+            } else {
+                start = new Date(now.getFullYear(), now.getMonth() - 1, 26);
+                end = new Date(now.getFullYear(), now.getMonth(), 25);
+            }
+            return dbAbsen.filter(a => {
+                const d = new Date(a.isoDate);
+                return a.nama === currentUser.name && a.tipe === 'MASUK' && d >= start && d <= end;
+            }).length;
+        }
+
+        // CAMERA & ABSEN
+        async function initCamera() {
+            if (cameraStream) return;
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('video-preview').srcObject = cameraStream;
+            } catch (err) { alert("Cek Izin Kamera!"); }
+        }
+
+        function takeSnapshot() {
+            const v = document.getElementById('video-preview');
+            const c = document.getElementById('canvas-photo');
+            c.width = v.videoWidth; c.height = v.videoHeight;
+            c.getContext('2d').drawImage(v, 0, 0);
+            currentPhoto = c.toDataURL('image/png');
+            document.getElementById('photo-result').src = currentPhoto;
+            document.getElementById('photo-result').classList.remove('hidden');
+            v.classList.add('hidden');
+        }
+
+        function submitAbsen(tipe) {
+            if(!currentPhoto || !currentCoords) return alert("Lengkapi Foto & Lokasi!");
+            dbAbsen.push({
+                tgl: new Date().toLocaleDateString('id-ID'),
+                jam: new Date().toLocaleTimeString('id-ID', {hour12:false}),
+                isoDate: new Date().toISOString(),
+                nama: currentUser.name,
+                tipe, loc: currentCoords, img: currentPhoto
+            });
+            localStorage.setItem('rbn_v9_absen', JSON.stringify(dbAbsen));
+            alert("Absensi " + tipe + " Berhasil Disimpan!");
+            // Reset absen form but STAY login
+            currentPhoto = "";
+            document.getElementById('photo-result').classList.add('hidden');
+            document.getElementById('video-preview').classList.remove('hidden');
+            showPage('dashboard');
+        }
+
+        // ADMIN TOOLS
+        function addEmployee() {
+            const id = document.getElementById('newInpID').value;
+            const name = document.getElementById('newInpName').value;
+            const pin = document.getElementById('newInpPin').value;
+            if(!id || !name || !pin) return alert("Lengkapi Data!");
+            dbKaryawan.push({id, name, pin, role:'karyawan'});
+            localStorage.setItem('rbn_v9_karyawan', JSON.stringify(dbKaryawan));
+            renderKaryawanTable();
+        }
+
+        function importCSV() {
+            const f = document.getElementById('csvFile').files[0];
+            if(!f) return alert("Pilih File!");
+            const r = new FileReader();
+            r.onload = function(e) {
+                const lines = e.target.result.split('\n');
+                lines.forEach(l => {
+                    const data = l.split(',');
+                    if(data.length >= 3) {
+                        dbKaryawan.push({id: data[0].trim(), name: data[1].trim(), pin: data[2].trim(), role:'karyawan'});
+                    }
+                });
+                localStorage.setItem('rbn_v9_karyawan', JSON.stringify(dbKaryawan));
+                renderKaryawanTable();
+                alert("Import Selesai!");
+            };
+            r.readAsText(f);
+        }
+
+        function renderKaryawanTable() {
+            document.getElementById('listKaryawan').innerHTML = dbKaryawan.map((e, i) => `
+                <tr class="border-b"><td class="p-4 font-bold">${e.id}</td><td class="p-4 uppercase">${e.name}</td>
+                <td class="p-4 text-right">${e.role==='admin'?'':`<button onclick="delEmp(${i})" class="text-red-400"><i class="fas fa-trash"></i></button>`}</td></tr>`).join('');
+        }
+
+        function delEmp(i) { dbKaryawan.splice(i,1); localStorage.setItem('rbn_v9_karyawan', JSON.stringify(dbKaryawan)); renderKaryawanTable(); }
+
+        function renderRekapTable() {
+            document.getElementById('listRekap').innerHTML = dbAbsen.slice().reverse().map(a => `
+                <tr class="border-b">
+                    <td class="p-4 text-[9px]">${a.tgl}<br>${a.jam}</td><td class="p-4 font-black uppercase text-gray-700">${a.nama}</td>
+                    <td class="p-4 text-center ${a.tipe==='MASUK'?'text-green-600':'text-red-600'} font-bold">${a.tipe}</td>
+                    <td class="p-4 text-center"><img src="${a.img}" class="w-8 h-8 rounded-lg mx-auto"></td>
+                    <td class="p-4 text-center"><a href="https://www.google.com/maps?q=${a.loc}" target="_blank" class="text-blue-500"><i class="fas fa-map-marker-alt"></i></a></td>
+                </tr>`).join('');
+        }
+
+        function setDefaultDates() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth() - (now.getDate() < 26 ? 1 : 0), 26);
+            const end = new Date(now.getFullYear(), now.getMonth() + (now.getDate() < 26 ? 0 : 1), 25);
+            document.getElementById('exportStart').value = start.toISOString().split('T')[0];
+            document.getElementById('exportEnd').value = end.toISOString().split('T')[0];
+        }
+
+        function downloadCSV() {
+            const s = new Date(document.getElementById('exportStart').value);
+            const e = new Date(document.getElementById('exportEnd').value);
+            e.setHours(23,59,59);
+            const filtered = dbAbsen.filter(a => {
+                const d = new Date(a.isoDate);
+                return d >= s && d <= e;
+            });
+            let csv = "Tanggal,Jam,Nama,Status,Lokasi\n";
+            filtered.forEach(a => { csv += `${a.tgl},${a.jam},${a.nama},${a.tipe},"${a.loc}"\n`; });
+            const b = new Blob([csv], {type:'text/csv'});
+            const u = URL.createObjectURL(b);
+            const l = document.createElement('a');
+            l.href = u; l.download = `Payroll_YRBN_${s.toISOString().split('T')[0]}_sd_${e.toISOString().split('T')[0]}.csv`;
+            l.click();
+        }
+
+        setInterval(() => {
+            const n = new Date();
+            document.getElementById('liveTime').innerText = n.toLocaleTimeString('id-ID');
+            document.getElementById('liveDate').innerText = n.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long'});
+        }, 1000);
+    </script>
+</body>
+</html>
